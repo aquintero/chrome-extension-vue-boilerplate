@@ -3,6 +3,8 @@ const path = require('path')
 const utils = require('./utils')
 const config = require('../config')
 const vueLoaderConfig = require('./vue-loader.conf')
+const CopyWebpackPlugin = require('copy-webpack-plugin')
+const webpack = require('webpack');
 
 function resolve (dir) {
   return path.join(__dirname, '..', dir)
@@ -22,7 +24,9 @@ const createLintingRule = () => ({
 module.exports = {
   context: path.resolve(__dirname, '../'),
   entry: {
-    app: './src/main.js'
+    'popup': './src/scripts/popup.js',
+    'app': './src/scripts/app.js',
+    'background': './src/scripts/background.js'
   },
   output: {
     path: config.build.assetsRoot,
@@ -38,13 +42,33 @@ module.exports = {
       '@': resolve('src'),
     }
   },
+  plugins: [
+    new CopyWebpackPlugin([{
+      from: "src/manifest.json",
+      transform: function (content, path) {
+        // generates the manifest file using the package.json informations
+        return Buffer.from(JSON.stringify({
+          description: process.env.npm_package_description,
+          version: process.env.npm_package_version,
+          ...JSON.parse(content.toString())
+        }))
+      }
+    }]),
+    new webpack.ProvidePlugin({
+      $: "jquery",
+      jQuery: "jquery"
+    })
+  ],
   module: {
     rules: [
       ...(config.dev.useEslint ? [createLintingRule()] : []),
       {
         test: /\.vue$/,
         loader: 'vue-loader',
-        options: vueLoaderConfig
+        options: {
+          limit: 10000,
+          name: utils.assetsPath('src/[name].[hash:7].[ext]')
+        }
       },
       {
         test: /\.js$/,
