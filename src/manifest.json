@@ -1,14 +1,24 @@
 {
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlOirjf8YqnxPlkP0TkIgKpFj+WbTSWfXMAx/Hukg5ljkX6tCtsp0nva1//8yp5ROoqz/mZNh64CSRma2J1uLAD3LLFkzaYf4dECmIe1iicGKlVVc1/C1Qk9UMgOWzCbcrmcV/8p9cwchHUhO8M/SOuc9cxteFE7CIrBj+aPfTFQexQkk6SL0KBQzPmPoUCfcuPxytw/xCCSt6qyJYYCy5CkZ3XHWYiaEJqzWci0H/3nSHLKo87AjG3Lo6d8UhKVDLjup/69bAg4QOGVq0ntO99XTGitcC5QYPNzww287yIZodRYr/82TXlYTqvIAnGevXgNGYC8cgR0VkAt/bIYM/wIDAQAB",
     "name": "Feedback",
     "version": "1.0",
     "description": "feedback",
     "manifest_version": 2,
-    "permissions": ["storage"],
     "background": {
-        "scripts": ["js/background.js"],
-        "persistent": false
+        "scripts": ["js/background.js"]
     },
     "browser_action": {
       "default_popup": "popup.html"
+    },
+    "permissions": [
+        "identity"
+    ],
+    "content_security_policy": "script-src 'self' https://www.gstatic.com/ https://*.firebaseio.com https://www.googleapis.com; object-src 'self'",
+    "oauth2": {
+        "client_id": "421778894917-tlfcfttl6lflpuuviueap4v383cqjsoj.apps.googleusercontent.com",
+        "scopes": [
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile"
+        ]
     }
 }

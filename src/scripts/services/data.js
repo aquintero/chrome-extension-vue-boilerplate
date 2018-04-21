@@ -1,122 +1,166 @@
-var metaTables = {
-  Courses: {
-    next_id: 0,
-    ids: []
-  },
-  Assignments: {
-    next_id: 0,
-    ids: []
-  }
-}
+import moment from 'moment'
+import * as firebase from 'firebase'
+import 'firebase/firestore'
 
-chrome.storage.onChanged.addListener((changes, namespace) => {
-  for (var key in changes) {
-    var storageChange = changes[key]
-    console.log(key, storageChange.oldValue, storageChange.newValue)
-  }
-})
+var metaTables = [
+  { name: 'Courses', ordered: true },
+  { name: 'Assignments', ordered: true },
+  { name: 'FeedbackItems', ordered: true },
+  { name: 'AssignmentItems', ordered: true }
+]
 
-class DataStore {
-  constructor (store, data) {
-    this.store = store
-    this.data = data
-  }
-
-  set (key, value) {
-    this.data[key] = value
-    var change = {}
-    change[key] = value
-    this.store.set(change)
-  }
-
-  get (key) {
-    return this.data[key]
-  }
-
-  remove (key) {
-    this.store.remove(key)
-  }
-
-  hasKey (key) {
-    return this.data.hasOwnProperty(key)
-  }
-}
+var db = firebase.firestore()
 
 class TableAPI {
-  constructor (store, name) {
-    this.store = store
+  constructor (name, ordered) {
     this.name = name
-    this.metaTable = this.store.get(this.name)
+    this.ordered = ordered
+    if (this.ordered) {
+      this.nextOrder = 0
+      this.getMeta('nextOrder').then((nextOrder) => {
+        if (nextOrder.exists) {
+          this.nextOrder = nextOrder.data().nextOrder
+        }
+      })
+    }
   }
 
   add (item) {
-    item.id = this.metaTable.next_id
-    this.metaTable.next_id += 1
-    this.metaTable.ids.push(item.id)
-    this.store.set(this.name, this.metaTable)
-    this.store.set(this.name + item.id, this.metaTable.setTransform(item))
+    return new Promise((resolve, reject) => {
+      Object.assign(item, {
+        _date_created: moment().toDate(),
+        _date_modified: moment().toDate(),
+        _uid: firebase.auth().currentUser.uid
+      })
+      if (this.ordered) {
+        Object.assign(item, {
+          _order: this.nextOrder
+        })
+        this.nextOrder += 1
+        this.setMeta('nextOrder', { nextOrder: this.nextOrder })
+      }
+      db.collection(this.name).add(item).then((doc) => {
+        item.id = doc.id
+        resolve(item)
+      })
+    })
   }
 
   update (item) {
-    this.store.set(this.name + item.id, this.metaTable.setTransform(item))
-  }
-
-  reorder (items) {
-    items.forEach((item) => {
-      var index = this.metaTable.ids.indexOf(item.id)
-      this.metaTable.ids.splice(index, 1)
-      this.metaTable.ids.push(item.id)
+    return new Promise((resolve, reject) => {
+      item._date_modified = moment().toDate()
+      var itemCopy = Object.assign({}, item)
+      delete itemCopy.id
+      db.collection(this.name).doc(item.id).update(itemCopy).then((updatedItem) => {
+        resolve(updatedItem)
+      })
     })
-    this.store.set(this.name, this.metaTable)
   }
 
   remove (item) {
-    var idx = this.metaTable.ids.indexOf(item.id)
-    if (idx > -1) {
-      this.metaTable.ids.splice(idx, 1)
-    }
-    this.store.remove(this.name + item.id)
-    this.store.set(this.name, this.metaTable)
+    return new Promise((resolve, reject) => {
+      db.collection(this.name).doc(item.id).delete().then(() => {
+        resolve()
+      })
+    })
   }
 
   get (id) {
-    return this.metaTable.getTransform(this.store.get(this.name + id))
+    return new Promise((resolve, reject) => {
+      db.collection(this.name).doc(id).get().then((doc) => {
+        var item = doc.data()
+        item.id = doc.id
+        resolve(item)
+      })
+    })
   }
 
   getAll () {
-    var items = []
-    this.metaTable.ids.forEach((id) => {
-      items.push(this.metaTable.getTransform(this.store.get(this.name + id)))
+    return new Promise((resolve, reject) => {
+      var query = db.collection(this.name).where('_uid', '==', firebase.auth().currentUser.uid)
+      if (this.ordered) {
+        query = query.orderBy('_order')
+      }
+      query.get().then((docs) => {
+        var items = []
+        docs.forEach((doc) => {
+          var item = doc.data()
+          item.id = doc.id
+          items.push(item)
+        })
+        resolve(items)
+      })
     })
-    return items
+  }
+
+  getWhere (column, comparison, value) {
+    if (column === 'id') {
+      column = firebase.firestore.FieldPath.documentId()
+    }
+    return new Promise((resolve, reject) => {
+      var query = db.collection(this.name).where('_uid', '==', firebase.auth().currentUser.uid).where(column, comparison, value)
+      if (this.ordered) {
+        query = query.orderBy('_order')
+      }
+      query.get().then((docs) => {
+        var items = []
+        docs.forEach((doc) => {
+          var item = doc.data()
+          item.id = doc.id
+          items.push(item)
+        })
+        resolve(items)
+      })
+    })
+  }
+
+  reorder (items, fromIndex, toIndex) {
+    if (!this.ordered) {
+      return
+    }
+    var sortedItems = items.slice().sort((item1, item2) => item1._order - item2._order)
+    var fromOrder = sortedItems[fromIndex]._order
+    var toOrder = sortedItems[toIndex]._order
+    return new Promise((resolve, reject) => {
+      var filteredItems = items.filter((item) => item._order >= Math.min(fromOrder, toOrder) && item._order <= Math.max(fromOrder, toOrder))
+      filteredItems.sort((item1, item2) => item1._order - item2._order)
+      if (fromOrder < toOrder) {
+        filteredItems.reverse()
+      }
+      var updates = []
+      for (var i = 1; i < filteredItems.length; i++) {
+        filteredItems[i - 1]._order = filteredItems[i]._order
+        updates.push(this.update(filteredItems[i - 1]))
+      }
+      filteredItems[filteredItems.length - 1]._order = toOrder
+      updates.push(this.update(filteredItems[filteredItems.length - 1]))
+      Promise.all(updates).then(() => {
+        resolve(items)
+      })
+    })
+  }
+
+  setMeta (prop, value) {
+    return new Promise((resolve, reject) => {
+      db.collection('meta_' + this.name).doc(prop).set(value, { merge: true }).then((setValue) => {
+        resolve(setValue)
+      })
+    })
+  }
+
+  getMeta (prop) {
+    return new Promise((resolve, reject) => {
+      db.collection('meta_' + this.name).doc(prop).get().then((value) => {
+        resolve(value)
+      })
+    })
   }
 }
 
-function init (store) {
-  var api = {}
+var api = {}
 
-  Object.getOwnPropertyNames(metaTables).forEach((tableName) => {
-    if (!store.hasKey(tableName)) {
-      store.set(tableName, metaTables[tableName])
-    }
-    var metaTable = store.get(tableName)
-    metaTable['setTransform'] = (val) => { return val }
-    metaTable['getTransform'] = (val) => { return val }
-    if (metaTables[tableName].hasOwnProperty('setTransform')) {
-      metaTable['setTransform'] = metaTables[tableName].setTransform
-    }
-    if (metaTables[tableName].hasOwnProperty('getTransform')) {
-      metaTable['getTransform'] = metaTables[tableName].getTransform
-    }
-    store.set(tableName, metaTable)
-    api[tableName] = new TableAPI(store, tableName)
-  })
-
-  return api
-}
-
-export default new Promise((resolve, reject) => {
-  chrome.storage.sync.get(null, (data) => {
-    resolve(init(new DataStore(chrome.storage.sync, data)))
-  })
+metaTables.forEach((table) => {
+  api[table.name] = new TableAPI(table.name, table.ordered)
 })
+
+export default api

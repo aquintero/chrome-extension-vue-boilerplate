@@ -27,9 +27,12 @@
         </v-form>
       </v-dialog>
     </v-layout>
-    <v-data-table :items="courses" :headers="courseColumns">
+    <v-data-table ref="coursesTable" :items="courses" :headers="courseColumns" hide-actions>
       <template slot="items" slot-scope="props">
-        <tr @dblclick="$router.push({name: 'Course', params: {id: props.item.id}})">
+        <tr class="sortableRow" :key="props.item.id" @dblclick="$router.push({name: 'Course', params: {id: props.item.id}})">
+          <td class="px-1" style="width: 0.1%">
+            <v-btn style="cursor: move" icon class="sortHandle"><v-icon>drag_handle</v-icon></v-btn>
+          </td>
           <td>
             <v-edit-dialog :return-value.sync="props.item.name" lazy >
               {{ props.item.name }}
@@ -39,13 +42,13 @@
                 v-model="props.item.name"
                 single-line
                 autofocus
-                @keydown.native.enter="db.Courses.update(props.item)"
+                @keydown.native.enter="updateCourse(props.item)"
               ></v-text-field>
             </v-edit-dialog>
           </td>
           <td class="justify-center layout px-0">
             <v-btn icon class="mx-0" @click="deleteCourse(props.item)">
-              <v-icon color="red">delete</v-icon>
+              <v-icon>delete</v-icon>
             </v-btn>
           </td>
         </tr>
@@ -55,39 +58,64 @@
 </template>
 
 <script>
-
+import db from '../services/data'
+import Sortable from 'sortablejs'
 export default {
   name: 'Courses',
+  mounted () {
+    var self = this
+    /* eslint-disable no-new */
+    new Sortable(
+      self.$refs.coursesTable.$el.getElementsByTagName('tbody')[0],
+      {
+        draggable: '.sortableRow',
+        handle: '.sortHandle',
+        onEnd: self.moveCourse
+      }
+    )
+  },
   data () {
+    var self = this
     var vm = {
-      db: null,
       showNewCourseDialog: false,
       courses: [],
       courseColumns: [
+        { text: '', value: '', sortable: false },
         { text: 'Course', value: 'Course', sortable: false },
         { text: 'Actions', value: 'actions', align: 'right', sortable: false, width: 50 }
       ],
       emptyCourse: { name: '' },
       newCourse: {},
       save () {
-        this.courses.push(this.newCourse)
-        this.db.Courses.add(this.newCourse)
-        this.showNewCourseDialog = false
+        self.courses.push(self.newCourse)
+        db.Courses.add(self.newCourse)
+        self.showNewCourseDialog = false
       },
       close () {
-        this.showNewCourseDialog = false
+        self.showNewCourseDialog = false
       },
       deleteCourse (course) {
-        const index = this.courses.indexOf(course)
+        const index = self.courses.indexOf(course)
         if (confirm('Are you sure you want to delete this course?')) {
-          this.courses.splice(index, 1)
-          this.db.Courses.remove(course)
+          self.courses.splice(index, 1)
+          db.Courses.remove(course)
         }
+      },
+      updateCourse (course) {
+        db.Courses.update(course)
+      },
+      moveCourse ({oldIndex, newIndex}) {
+        db.Courses.reorder(self.courses, oldIndex, newIndex).then((orderedCourses) => {
+          self.courses = orderedCourses
+        })
       }
     }
-    require('../services/data').default.then((data) => {
-      vm.db = data
-      vm.courses = vm.db.Courses.getAll()
+
+    db.Courses.getAll().then((courses) => {
+      courses.sort((course1, course2) => {
+        return course1.order - course2.order
+      })
+      vm.courses = courses
     })
     return vm
   },
