@@ -15,15 +15,5 @@ export default {
 </script>
 
 <style>
-html {
-  overflow: hidden;
-}
-.content {
-  max-height: 100vh;
-}
-.scroll-container {
-  height: 100%;
-  overflow-y: scroll;
-  backface-visibility: hidden;
-}
+
 </style>

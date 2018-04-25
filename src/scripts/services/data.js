@@ -5,7 +5,6 @@ import 'firebase/firestore'
 var metaTables = [
   { name: 'Courses', ordered: true },
   { name: 'Assignments', ordered: true },
-  { name: 'FeedbackItems', ordered: true },
   { name: 'AssignmentItems', ordered: true }
 ]
 
@@ -162,5 +161,56 @@ var api = {}
 metaTables.forEach((table) => {
   api[table.name] = new TableAPI(table.name, table.ordered)
 })
+
+api.AssignmentItemTypes = [
+  {
+    name: 'Group',
+    markdown: false,
+    props: [
+      { name: 'Name', required: true }
+    ],
+    levels: [
+      'Root'
+    ],
+    expandable: true
+  },
+  {
+    name: 'Criterion',
+    markdown: '## {Name}',
+    props: [
+      { name: 'Name', required: true },
+      { name: 'Standard', required: false }
+    ],
+    levels: [
+      'Root',
+      'Group'
+    ],
+    expandable: true
+  },
+  {
+    name: 'Sub Criterion',
+    markdown: '#### {Name}',
+    props: [
+      { name: 'Name', required: true },
+      { name: 'Standard', required: false }
+    ],
+    levels: [
+      'Criterion'
+    ],
+    expandable: true
+  },
+  {
+    name: 'Diagnosis',
+    markdown: '* {feedback}',
+    props: [
+      { name: 'Name', required: true },
+      { name: 'Feedback', required: false }
+    ],
+    levels: [
+      'Criterion',
+      'Sub Criterion'
+    ]
+  }
+]
 
 export default api

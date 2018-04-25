@@ -3,7 +3,7 @@ import Router from 'vue-router'
 import * as firebase from 'firebase'
 import Courses from '@/scripts/components/Courses.vue'
 import Course from '@/scripts/components/Course.vue'
-import Assignment from '@/scripts/components/Assignment.vue'
+import Assignment from '@/scripts/components/Assignment/Assignment.vue'
 import 'material-icons/iconfont/material-icons.css'
 
 Vue.use(Router)
