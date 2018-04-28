@@ -1,6 +1,7 @@
 import Vue from 'vue'
 import Router from 'vue-router'
 import * as firebase from 'firebase'
+import Home from '@/scripts/components/Home.vue'
 import Courses from '@/scripts/components/Courses.vue'
 import Course from '@/scripts/components/Course.vue'
 import Assignment from '@/scripts/components/Assignment/Assignment.vue'
@@ -12,6 +13,11 @@ var router = new Router({
   routes: [
     {
       path: '/',
+      name: 'Home',
+      component: Home
+    },
+    {
+      path: '/Courses',
       name: 'Courses',
       component: Courses
     },
