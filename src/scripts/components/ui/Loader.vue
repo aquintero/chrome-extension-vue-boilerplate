@@ -1,16 +1,16 @@
 <template>
   <div>
-    <div class='loader'>
-      <v-progress-circular v-if="!loaded" indeterminate :size="50" color="primary" class="loader"></v-progress-circular>
+    <div v-if="loading" class='loader'>
+      <v-progress-circular  indeterminate :size="50" color="primary" class="loader"></v-progress-circular>
     </div>
-    <slot v-if="loaded"></slot>
+    <slot v-else></slot>
   </div>
 </template>
 <script>
 export default {
   name: 'Loader',
   props: {
-    loaded: { type: Boolean, default: false }
+    loading: { type: Boolean, default: true }
   }
 }
 </script>

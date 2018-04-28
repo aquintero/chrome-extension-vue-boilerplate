@@ -4,44 +4,45 @@
       <v-icon class="icon"></v-icon>
       <slot name="header"><div class="title-container"><span class="title">{{ title }}</span></div></slot>
       <v-spacer></v-spacer>
-      <v-menu class="right-icon text-xs-center" offset-y left>
+      <v-menu v-if="actions" class="right-icon text-xs-center" offset-y left>
         <v-btn icon small slot="activator">
           <v-icon color="grey darken-1">more_vert</v-icon>
         </v-btn>
         <v-list>
-          <div v-for="(action, actionName) in actions" :key="actionName">
-            <dialog-form v-if="action.dialog" :title="action.text" @saved="(val) => $emit(actionName, val)" @opened="$emit(actionName + '-dialog-opened')">
-              <v-list-tile class="action-button" slot="activator">
+          <div v-if="!('condition' in action) || action.condition" v-for="(action, actionName) in actions" :key="actionName">
+            <dialog-form class="action-button" v-if="action.dialog" :title="action.text" @saved="trigger(actionName, action)" @opened="trigger(actionName + '-dialog-opened', action)">
+              <v-list-tile slot="activator">
                 <v-list-tile-title>{{ action.text }}</v-list-tile-title>
               </v-list-tile>
               <slot slot="title" :name="action + '-form-title'"></slot>
               <slot :name="actionName + '-form'"></slot>
             </dialog-form>
-            <v-list-tile v-else @click="$emit(actionName)" slot="activator">
+            <v-list-tile v-else @click="trigger(actionName, action)" slot="activator">
               <v-list-tile-title>{{ action.text }}</v-list-tile-title>
             </v-list-tile>
           </div>
         </v-list>
       </v-menu>
     </v-layout>
-    <loader class="list-body" :loaded="loaded">
-      <draggable v-model="d_items" :options="{ group: c_group }" @change="itemMoved" @start="itemDragStart" @end="itemDragEnd" :move="itemDragging">
-        <v-layout row justify-start class="list-row"
-                  v-for="(item, index) in d_items"
-                  :key="item[keyProp]"
-                  :class="{ selected: index === selectedIndex, hovered: !moving && index === hoverIndex }"
-                  @click="selectedIndex = index"
-                  @mouseover="hoverIndex = index"
-                  @mouseout="hoverIndex = -1">
-          <v-icon class="icon"></v-icon>
-          <slot name="item" :props="item">{{ item[textProp] }}</slot>
-          <v-spacer></v-spacer>
-          <div class="right-icon text-xs-center">
-            <v-icon v-show="index === selectedIndex">keyboard_arrow_right</v-icon>
-          </div>
-        </v-layout>
+    <loader :loading="loading">
+      <draggable v-model="d_items" @change="itemMoved" @start="itemDragStart" @end="itemDragEnd" :move="itemDragging">
+        <div v-for="(item, index) in d_items" :key="item[keyProp]">
+          <v-layout row justify-start class="list-row"
+                    :class="{ selected: index === selectedIndex, hovered: !moving && index === hoverIndex }"
+                    @click="select(index)"
+                    @mouseover="hoverIndex = index"
+                    @mouseout="hoverIndex = -1">
+            <v-icon class="icon"></v-icon>
+            <slot name="item" :props="item">{{ item[textProp] }}</slot>
+            <v-spacer></v-spacer>
+            <div class="right-icon text-xs-center">
+              <v-icon v-show="index === selectedIndex">keyboard_arrow_right</v-icon>
+            </div>
+          </v-layout>
+        </div>
       </draggable>
     </loader>
+    <v-spacer></v-spacer>
   </v-layout>
 </template>
 <script>
@@ -59,19 +60,17 @@ export default {
     items: { type: Array, required: true },
     keyProp: { type: String, default: 'id' },
     textProp: { type: String, default: 'text' },
-    actions: { type: Object },
-    async: { type: Boolean, default: true },
+    actions: { type: Object, default: () => {} },
+    loading: { type: Boolean, default: true },
     title: { type: String },
-    group: { type: String },
     adderText: { type: String, default: '' },
-    selectable: { type: Boolean, default: true }
+    selectedItem: { type: Object }
   },
   data () {
     return {
       d_items: [],
-      loaded: !this.async,
       showAddDialog: false,
-      selectedIndex: 0,
+      selectedIndex: -1,
       hoverIndex: -1,
       moving: false
     }
@@ -79,23 +78,25 @@ export default {
   computed: {
     c_hasHeader () {
       return this.$slots.header || this.title !== null
-    },
-    c_group () {
-      return this.group || this.title || ''
     }
   },
   watch: {
     items (newItems) {
-      this.loaded = true
       this.d_items = newItems
+      if (newItems.length > 0) {
+        this.selectedIndex = 0
+        this.$emit('selected', this.d_items[this.selectedIndex])
+      } else {
+        this.selectedIndex = -1
+      }
+    },
+    selectedItem (item) {
+      this.selectedIndex = this.d_items.findIndex(i => i.id === item.id)
     }
   },
   methods: {
-    added () {
-      this.$emit('insert')
-    },
-    dialogOpened () {
-      this.$emit('insert-dialog-opened')
+    trigger (actionName, action) {
+      this.$emit(actionName)
     },
     itemMoved (e) {
       if (e.moved) {
@@ -111,6 +112,11 @@ export default {
     itemDragEnd (e) {
       this.moving = false
       this.selectedIndex = e.newIndex
+      this.$emit('selected', this.d_items[this.selectedIndex])
+    },
+    select (index) {
+      this.selectedIndex = index
+      this.$emit('selected', this.d_items[this.selectedIndex])
     }
   }
 }
@@ -118,6 +124,11 @@ export default {
 <style scoped>
   .list-container {
     flex-basis: auto;
+    min-height: 100%;
+    border-left: 1px solid;
+    border-top: 1px solid;
+    border-bottom: 1px solid;
+    border-color: #d7d7d7;
   }
   .list-header, .list-adder, .list-row {
     padding-left: 20px;
@@ -125,6 +136,10 @@ export default {
     padding-top: 4px;
     padding-bottom: 4px;
     color: #757575;
+  }
+  .list-header {
+    height: 50px;
+    max-height: 50px;
   }
   .list-adder, .list-row {
     background: white;
@@ -138,24 +153,11 @@ export default {
   }
   .list-header {
     background: #f5f5f5;
-    border: 1px solid;
-    border-color: #d7d7d7;
-  }
-  .list-adder{
-    line-height: 36px;
-    color: #039be5;
-    border-left: 1px solid;
-    border-right: 1px solid;
+    border-bottom: 1px solid;
     border-color: #d7d7d7;
   }
   .list-row {
     line-height: 24px;
-  }
-  .list-body {
-    border-left: 1px solid;
-    border-right: 1px solid;
-    border-bottom: 1px solid;
-    border-color: #d7d7d7;
   }
   .right-icon {
     width: 50px;
@@ -164,6 +166,9 @@ export default {
     height:20px;
     margin-top: auto;
     margin-bottom: auto;
+  }
+  .action-button {
+    width: 100%;
   }
   .action-button:hover {
     background: rgba(0, 0, 0, .12);
