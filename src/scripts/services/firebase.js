@@ -1,5 +1,4 @@
 import * as firebase from 'firebase'
-
 firebase.initializeApp({
   apiKey: 'AIzaSyClQ5Hz1TiJQIcF834ntsVLRXbQkZ1lkYg',
   authDomain: 'feedback-ae1a2.firebaseapp.com',
@@ -8,3 +7,14 @@ firebase.initializeApp({
   storageBucket: 'feedback-ae1a2.appspot.com',
   messagingSenderId: '421778894917'
 })
+export default {
+  authenticated () {
+    return new Promise((resolve, reject) => {
+      firebase.auth().onAuthStateChanged(function (user) {
+        if (user) {
+          resolve()
+        }
+      })
+    })
+  }
+}

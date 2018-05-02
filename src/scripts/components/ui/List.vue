@@ -80,20 +80,6 @@ export default {
       return this.$slots.header || this.title !== null
     }
   },
-  watch: {
-    items (newItems) {
-      this.d_items = newItems
-      if (newItems.length > 0) {
-        this.selectedIndex = 0
-        this.$emit('selected', this.d_items[this.selectedIndex])
-      } else {
-        this.selectedIndex = -1
-      }
-    },
-    selectedItem (item) {
-      this.selectedIndex = this.d_items.findIndex(i => i.id === item.id)
-    }
-  },
   methods: {
     trigger (actionName, action) {
       this.$emit(actionName)

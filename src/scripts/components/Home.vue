@@ -61,30 +61,30 @@
 <script>
 import db from '@/scripts/services/data.js'
 import List from '@/scripts/components/ui/List.vue'
+import { mapState } from 'vuex'
 export default {
   name: 'Home',
   components: {
     List
   },
-  mounted () {
-    db.Courses.getAll().then((courses) => {
-      this.courses = courses
-      this.coursesLoading = false
-    })
-  },
   data () {
+    console.log(this)
     return {
-      courses: [],
-      coursesLoading: true,
       newCourse: {},
-      selectedCourse: {},
-      assignments: [],
-      assignmentsLoading: true,
       newAssignment: {},
       selectedAssignment: {},
       moveToCourse: {},
       moveToCourses: []
     }
+  },
+  computed: {
+    ...mapState({
+      courses: state => state.home.courses,
+      coursesLoading: state => state.home.coursesLoading,
+      selectedCourse: state => state.home.selectedCourse,
+      assignments: state => state.home.assignments,
+      assignmentsLoading: state => state.home.assignmentsLoading
+    })
   },
   methods: {
     addCourse () {
@@ -163,15 +163,6 @@ export default {
       this.moveToCourse = this.selectedCourse
       this.moveToCourses = this.courses.filter((course) => {
         return this.selectedCourse.id !== course.id
-      })
-    }
-  },
-  watch: {
-    selectedCourse (course) {
-      this.assignmentsLoading = true
-      db.Assignments.getWhere('courseId', '==', course.id).then((assignments) => {
-        this.assignments = assignments
-        this.assignmentsLoading = false
       })
     }
   }

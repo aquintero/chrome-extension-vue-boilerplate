@@ -2,13 +2,13 @@ import moment from 'moment'
 import * as firebase from 'firebase'
 import 'firebase/firestore'
 
-var metaTables = [
+const metaTables = [
   { name: 'Courses', ordered: true },
   { name: 'Assignments', ordered: true },
   { name: 'AssignmentItems', ordered: true }
 ]
 
-var db = firebase.firestore()
+const db = firebase.firestore()
 
 class TableAPI {
   constructor (name, ordered) {
@@ -24,139 +24,113 @@ class TableAPI {
     }
   }
 
-  add (item) {
-    return new Promise((resolve, reject) => {
+  async add (item) {
+    Object.assign(item, {
+      _date_created: moment().toDate(),
+      _date_modified: moment().toDate(),
+      _uid: firebase.auth().currentUser.uid
+    })
+    if (this.ordered) {
       Object.assign(item, {
-        _date_created: moment().toDate(),
-        _date_modified: moment().toDate(),
-        _uid: firebase.auth().currentUser.uid
+        _order: this.nextOrder
       })
-      if (this.ordered) {
-        Object.assign(item, {
-          _order: this.nextOrder
-        })
-        this.nextOrder += 1
-        this.setMeta('nextOrder', { nextOrder: this.nextOrder })
-      }
-      db.collection(this.name).add(item).then((doc) => {
-        item.id = doc.id
-        resolve(item)
-      })
-    })
+      this.nextOrder += 1
+      this.setMeta('nextOrder', { nextOrder: this.nextOrder })
+    }
+    let doc = await db.collection(this.name).add(item)
+    item.id = doc.id
+    return item
   }
 
-  update (item) {
-    return new Promise((resolve, reject) => {
-      item._date_modified = moment().toDate()
-      var itemCopy = Object.assign({}, item)
-      delete itemCopy.id
-      db.collection(this.name).doc(item.id).update(itemCopy).then((updatedItem) => {
-        resolve(updatedItem)
-      })
-    })
+  async update (item) {
+    item._date_modified = moment().toDate()
+    let itemCopy = Object.assign({}, item)
+    delete itemCopy.id
+    let updatedItem = await db.collection(this.name).doc(item.id).update(itemCopy)
+    return updatedItem
   }
 
-  remove (item) {
-    return new Promise((resolve, reject) => {
-      db.collection(this.name).doc(item.id).delete().then(() => {
-        resolve()
-      })
-    })
+  async remove (item) {
+    await db.collection(this.name).doc(item.id).delete()
+    return item
   }
 
-  get (id) {
-    return new Promise((resolve, reject) => {
-      db.collection(this.name).doc(id).get().then((doc) => {
-        var item = doc.data()
-        item.id = doc.id
-        resolve(item)
-      })
-    })
+  async get (id) {
+    let doc = await db.collection(this.name).doc(id).get()
+    let item = doc.data()
+    item.id = doc.id
+    return item
   }
 
-  getAll () {
-    return new Promise((resolve, reject) => {
-      var query = db.collection(this.name).where('_uid', '==', firebase.auth().currentUser.uid)
-      if (this.ordered) {
-        query = query.orderBy('_order')
-      }
-      query.get().then((docs) => {
-        var items = []
-        docs.forEach((doc) => {
-          var item = doc.data()
-          item.id = doc.id
-          items.push(item)
-        })
-        resolve(items)
-      })
+  async getAll () {
+    let query = db.collection(this.name).where('_uid', '==', firebase.auth().currentUser.uid)
+    if (this.ordered) {
+      query = query.orderBy('_order')
+    }
+    let docs = await query.get()
+    let items = []
+    docs.forEach((doc) => {
+      let item = doc.data()
+      item.id = doc.id
+      items.push(item)
     })
+    return items
   }
 
-  getWhere (column, comparison, value) {
+  async getWhere (column, comparison, value) {
     if (column === 'id') {
       column = firebase.firestore.FieldPath.documentId()
     }
-    return new Promise((resolve, reject) => {
-      var query = db.collection(this.name).where('_uid', '==', firebase.auth().currentUser.uid).where(column, comparison, value)
-      if (this.ordered) {
-        query = query.orderBy('_order')
-      }
-      query.get().then((docs) => {
-        var items = []
-        docs.forEach((doc) => {
-          var item = doc.data()
-          item.id = doc.id
-          items.push(item)
-        })
-        resolve(items)
-      })
+
+    let query = db.collection(this.name).where('_uid', '==', firebase.auth().currentUser.uid).where(column, comparison, value)
+    if (this.ordered) {
+      query = query.orderBy('_order')
+    }
+    let docs = await query.get()
+    let items = []
+    docs.forEach((doc) => {
+      let item = doc.data()
+      item.id = doc.id
+      items.push(item)
     })
+    return items
   }
 
-  reorder (items, fromIndex, toIndex) {
+  async reorder (items, fromIndex, toIndex) {
     if (!this.ordered) {
       return
     }
-    var sortedItems = items.slice().sort((item1, item2) => item1._order - item2._order)
-    var fromOrder = sortedItems[fromIndex]._order
-    var toOrder = sortedItems[toIndex]._order
-    return new Promise((resolve, reject) => {
-      var filteredItems = items.filter((item) => item._order >= Math.min(fromOrder, toOrder) && item._order <= Math.max(fromOrder, toOrder))
-      filteredItems.sort((item1, item2) => item1._order - item2._order)
-      if (fromOrder < toOrder) {
-        filteredItems.reverse()
-      }
-      var updates = []
-      for (var i = 1; i < filteredItems.length; i++) {
-        filteredItems[i - 1]._order = filteredItems[i]._order
-        updates.push(this.update(filteredItems[i - 1]))
-      }
-      filteredItems[filteredItems.length - 1]._order = toOrder
-      updates.push(this.update(filteredItems[filteredItems.length - 1]))
-      Promise.all(updates).then(() => {
-        resolve(items)
-      })
-    })
+    let sortedItems = items.slice().sort((item1, item2) => item1._order - item2._order)
+    let fromOrder = sortedItems[fromIndex]._order
+    let toOrder = sortedItems[toIndex]._order
+    let filteredItems = items.filter((item) => item._order >= Math.min(fromOrder, toOrder) && item._order <= Math.max(fromOrder, toOrder))
+    filteredItems.sort((item1, item2) => item1._order - item2._order)
+    if (fromOrder < toOrder) {
+      filteredItems.reverse()
+    }
+    let updates = []
+    for (let i = 1; i < filteredItems.length; i++) {
+      filteredItems[i - 1]._order = filteredItems[i]._order
+      updates.push(this.update(filteredItems[i - 1]))
+    }
+    filteredItems[filteredItems.length - 1]._order = toOrder
+    updates.push(this.update(filteredItems[filteredItems.length - 1]))
+    await Promise.all(updates)
+    return items
   }
 
-  setMeta (prop, value) {
-    return new Promise((resolve, reject) => {
-      db.collection('meta_' + this.name).doc(prop).set(value, { merge: true }).then((setValue) => {
-        resolve(setValue)
-      })
-    })
+  async setMeta (prop, value) {
+    let setValue = await db.collection('meta_' + this.name).doc(prop).set(value, { merge: true })
+    return setValue
   }
 
-  getMeta (prop) {
-    return new Promise((resolve, reject) => {
-      db.collection('meta_' + this.name).doc(prop).get().then((value) => {
-        resolve(value)
-      })
-    })
+  async getMeta (prop) {
+    let value = await db.collection('meta_' + this.name).doc(prop).get()
+    return value
   }
 }
 
-var api = {}
+let api = {}
 
 metaTables.forEach((table) => {
   api[table.name] = new TableAPI(table.name, table.ordered)
