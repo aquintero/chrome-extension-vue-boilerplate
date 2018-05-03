@@ -7,13 +7,15 @@ firebase.initializeApp({
   storageBucket: 'feedback-ae1a2.appspot.com',
   messagingSenderId: '421778894917'
 })
+
 export default {
   authenticated () {
     return new Promise((resolve, reject) => {
-      firebase.auth().onAuthStateChanged(function (user) {
-        if (user) {
+      chrome.identity.getAuthToken({ 'interactive': true }, (token) => {
+        var credential = firebase.auth.GoogleAuthProvider.credential(null, token)
+        firebase.auth().signInWithCredential(credential).then((user) => {
           resolve()
-        }
+        })
       })
     })
   }

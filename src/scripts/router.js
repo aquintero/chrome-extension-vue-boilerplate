@@ -40,12 +40,6 @@ router.beforeEach((to, from, next) => {
   if (firebase.auth().currentUser) {
     next()
   }
-  chrome.identity.getAuthToken({ 'interactive': true }, (token) => {
-    var credential = firebase.auth.GoogleAuthProvider.credential(null, token)
-    firebase.auth().signInWithCredential(credential).then((user) => {
-      next()
-    })
-  })
 })
 
 export default router
